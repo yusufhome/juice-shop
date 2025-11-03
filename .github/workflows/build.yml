@@ -8,6 +8,16 @@ on:
   workflow_dispatch:  
 
 jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: FetchSource
+        uses: actions/checkout@v4
+      - name: SecretScan
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+    
   semgrep:
     name: Scan
     runs-on: ubuntu-latest
@@ -23,3 +33,5 @@ jobs:
         with:
           sarif_file: semgrep.sarif
         if: always()
+        
+    
