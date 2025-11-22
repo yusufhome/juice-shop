@@ -11,21 +11,17 @@ jobs:
   semgrep:
     name: Semgrep SAST Scan
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep:latest
     steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-      - name: Run Semgrep
-        run: |
-          semgrep scan --config auto \
-          --sarif --output semgrep.sarif
-      - name: Upload SARIF file to GitHub Security
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@fcd5ab7459e8d91cb1777481980d1b18b4fc6735
+        with:
+          generateSarif: "1"
+      - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
         if: always()
-
+        
   container_scan:
     name: Trivy Container Scan
     runs-on: ubuntu-latest
