@@ -1,0 +1,74 @@
+name: Security Pipeline
+
+on:
+  push:
+    branches: [ "main" , "master" ]
+  pull_request:
+    branches: [ "main" , "master"]
+  workflow_dispatch: 
+
+jobs:
+  semgrep:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - name: Run Semgrep
+        run: |
+          semgrep scan --config auto \
+          --sarif --output semgrep.sarif
+      - name: Upload SARIF file to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+        if: always()
+
+  container_scan:
+    name: Trivy Container Scan
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: juice-shop
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build container image
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          format: 'sarif'
+          output: 'trivy-image.sarif'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+      - name: Upload Trivy SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-image.sarif
+  
+  secret_scan:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4    
+      - name: Run Gitleaks (repo)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      - name: Upload Gitleaks SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
